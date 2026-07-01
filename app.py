@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hook-Cutter: MP3-Intros wegschneiden mit einem Klick.
+Hook-Cutter: MP3-Intros wegschneiden mit einem Klick. Oder Nur Intros behalten.
 
 Nutzung:
     python app.py --input /pfad/zu/mp3s --output /pfad/zu/geschnitten [--port 5050]
