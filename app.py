@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hook-Cutter: MP3-Intros wegschneiden mit einem Klick. Oder Nur Intros behalten.
+Hook-Cutter: MP3-Intros wegschneiden mit einem Klick.
 
 Nutzung:
     python app.py --input /pfad/zu/mp3s --output /pfad/zu/geschnitten [--port 5050]
@@ -121,6 +121,7 @@ def api_files():
             {
                 "name": f,
                 "cut_at": state.get(f, {}).get("cut_at"),
+                "mode": state.get(f, {}).get("mode", "from"),
                 "skipped": state.get(f, {}).get("skipped", False),
             }
             for f in files
@@ -138,9 +139,13 @@ def api_cut():
     data = request.get_json(force=True)
     filename = data.get("filename")
     seconds = data.get("seconds")
+    mode = data.get("mode", "from")  # "from" = alles VOR der Markierung wegschneiden
+                                       # "to"   = alles NACH der Markierung wegschneiden
 
     if not filename or seconds is None:
         return jsonify({"ok": False, "error": "filename oder seconds fehlt"}), 400
+    if mode not in ("from", "to"):
+        return jsonify({"ok": False, "error": "ungueltiger mode"}), 400
 
     src = INPUT_DIR / filename
     if not src.exists():
@@ -152,24 +157,36 @@ def api_cut():
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    cmd = [
-        "ffmpeg", "-y",
-        "-ss", timestamp,
-        "-i", str(src),
-        "-c", "copy",
-        str(out_path),
-    ]
+    if mode == "from":
+        # Alles vor der Markierung wegschneiden (Standard: ab Hook)
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", timestamp,
+            "-i", str(src),
+            "-c", "copy",
+            str(out_path),
+        ]
+    else:
+        # Alles nach der Markierung wegschneiden (z.B. Intro behalten, Hook weg)
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", str(src),
+            "-to", timestamp,
+            "-c", "copy",
+            str(out_path),
+        ]
+
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
         return jsonify({"ok": False, "error": result.stderr[-800:]}), 500
 
     state = load_state()
-    state[filename] = {"cut_at": seconds, "skipped": False}
+    state[filename] = {"cut_at": seconds, "mode": mode, "skipped": False}
     save_state(state)
 
     return jsonify(
-        {"ok": True, "filename": filename, "seconds": seconds, "timestamp": timestamp}
+        {"ok": True, "filename": filename, "seconds": seconds, "timestamp": timestamp, "mode": mode}
     )
 
 

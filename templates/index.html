@@ -149,6 +149,30 @@
     gap: 12px;
     align-items: center;
   }
+  #mode-switch {
+    display: flex;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+  }
+  #mode-switch button {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    background: transparent;
+    color: var(--text-dim);
+    border-radius: 7px;
+  }
+  #mode-switch button.active {
+    background: var(--accent);
+    color: #0a1a0f;
+  }
+  #mode-switch button:not(.active):hover {
+    color: var(--text);
+    background: #262a32;
+  }
   button {
     font-family: inherit;
     border: none;
@@ -227,6 +251,11 @@
 </div>
 
 <div id="main">
+  <div id="mode-switch">
+    <button id="mode-from" class="active" title="Alles VOR der Markierung wegschneiden">✂️ Intro wegschneiden</button>
+    <button id="mode-to" title="Alles NACH der Markierung wegschneiden">✂️ Hook wegschneiden</button>
+  </div>
+
   <div id="songname">lädt...</div>
   <div id="timecode">00:00.0</div>
   <div id="duration"></div>
@@ -244,12 +273,13 @@
     <button class="btn-round" id="nextbtn" title="Nächster Song">⏭</button>
   </div>
 
-  <button id="markbtn">✂️ Hier ist der Schnitt!</button>
+  <button id="markbtn">✂️ Hier ist der Hook!</button>
   <button id="skipbtn">Ohne Schnitt übernehmen (kein Intro vorhanden)</button>
 
   <div class="hint">
     <b>Leertaste</b> = Play/Pause · <b>Enter</b> = Hier schneiden ·
-    <b>← →</b> = ±5s · <b>↑ ↓</b> = ±1s · <b>N</b> = nächster Song
+    <b>← →</b> = ±5s · <b>↑ ↓</b> = ±1s · <b>N</b> = nächster Song ·
+    <b>T</b> = Modus wechseln
   </div>
 
   <audio id="player"></audio>
@@ -261,6 +291,7 @@
 let files = [];
 let currentIndex = 0;
 let isSeeking = false;
+let cutMode = "from"; // "from" = Intro wegschneiden (ab hier behalten), "to" = Hook wegschneiden (bis hier behalten)
 const player = document.getElementById("player");
 const songname = document.getElementById("songname");
 const timecode = document.getElementById("timecode");
@@ -270,6 +301,20 @@ const progress = document.getElementById("progress");
 const filelist = document.getElementById("filelist");
 const seekbar = document.getElementById("seekbar");
 const cutMarker = document.getElementById("cut-marker");
+const markbtn = document.getElementById("markbtn");
+const modeFromBtn = document.getElementById("mode-from");
+const modeToBtn = document.getElementById("mode-to");
+
+function setMode(mode) {
+  cutMode = mode;
+  modeFromBtn.classList.toggle("active", mode === "from");
+  modeToBtn.classList.toggle("active", mode === "to");
+  markbtn.textContent = mode === "from"
+    ? "✂️ Hier ist der Hook!"
+    : "✂️ Hier endet das Intro!";
+}
+modeFromBtn.onclick = () => setMode("from");
+modeToBtn.onclick = () => setMode("to");
 
 function updateSeekbarFill() {
   const max = parseFloat(seekbar.max) || 0;
@@ -317,7 +362,7 @@ function renderList() {
     div.innerHTML = `
       <span class="file-name">${f.name}</span>
       <span class="file-status ${isDone ? 'done' : ''}">
-        ${f.skipped ? '➡️ übernommen' : (f.cut_at !== null ? '✅ ' + fmt(f.cut_at) : '')}
+        ${f.skipped ? '➡️ übernommen' : (f.cut_at !== null ? '✅ ' + (f.mode === 'to' ? 'bis ' : 'ab ') + fmt(f.cut_at) : '')}
       </span>
     `;
     div.onclick = () => loadSong(i);
@@ -397,19 +442,21 @@ function showToast(msg, isError = false) {
 async function markHook() {
   const f = files[currentIndex];
   const seconds = player.currentTime;
+  const mode = cutMode;
   player.pause();
   markbtn.disabled = true;
   try {
     const res = await fetch("/api/cut", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: f.name, seconds }),
+      body: JSON.stringify({ filename: f.name, seconds, mode }),
     });
     const data = await res.json();
     if (data.ok) {
       f.cut_at = data.seconds;
+      f.mode = data.mode;
       f.skipped = false;
-      showToast(`Geschnitten @ ${fmt(data.seconds)}`);
+      showToast(`Geschnitten (${mode === 'to' ? 'bis' : 'ab'} ${fmt(data.seconds)})`);
       renderList();
       updateCutMarker(f);
       setTimeout(goNext, 500);
@@ -480,6 +527,10 @@ document.addEventListener("keydown", (e) => {
     case "n":
     case "N":
       goNext();
+      break;
+    case "t":
+    case "T":
+      setMode(cutMode === "from" ? "to" : "from");
       break;
   }
 });
