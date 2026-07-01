@@ -87,6 +87,63 @@
     color: var(--accent);
   }
   #duration { font-size: 14px; color: var(--text-dim); }
+
+  #seek-wrap {
+    position: relative;
+    width: 480px;
+    max-width: 90vw;
+  }
+  #seekbar {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(
+      to right,
+      var(--accent) 0%,
+      var(--accent) var(--progress, 0%),
+      var(--border) var(--progress, 0%),
+      var(--border) 100%
+    );
+    outline: none;
+    cursor: pointer;
+    margin: 0;
+  }
+  #seekbar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.18);
+    margin-top: 0;
+  }
+  #seekbar::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.18);
+  }
+  #seekbar::-moz-range-track {
+    height: 6px;
+    border-radius: 3px;
+    background: transparent;
+  }
+  #cut-marker {
+    position: absolute;
+    top: -5px;
+    width: 2px;
+    height: 16px;
+    background: var(--danger);
+    pointer-events: none;
+    transform: translateX(-1px);
+    display: none;
+  }
   .controls {
     display: flex;
     gap: 12px;
@@ -174,6 +231,11 @@
   <div id="timecode">00:00.0</div>
   <div id="duration"></div>
 
+  <div id="seek-wrap">
+    <input type="range" id="seekbar" min="0" max="100" value="0" step="0.01">
+    <div id="cut-marker"></div>
+  </div>
+
   <div class="controls">
     <button class="btn-round" id="prevbtn" title="Vorheriger Song">⏮</button>
     <button class="btn-round" id="backbtn" title="-5s">−5</button>
@@ -198,6 +260,7 @@
 <script>
 let files = [];
 let currentIndex = 0;
+let isSeeking = false;
 const player = document.getElementById("player");
 const songname = document.getElementById("songname");
 const timecode = document.getElementById("timecode");
@@ -205,6 +268,24 @@ const duration = document.getElementById("duration");
 const playbtn = document.getElementById("playbtn");
 const progress = document.getElementById("progress");
 const filelist = document.getElementById("filelist");
+const seekbar = document.getElementById("seekbar");
+const cutMarker = document.getElementById("cut-marker");
+
+function updateSeekbarFill() {
+  const max = parseFloat(seekbar.max) || 0;
+  const pct = max > 0 ? (seekbar.value / max) * 100 : 0;
+  seekbar.style.setProperty("--progress", pct + "%");
+}
+
+function updateCutMarker(f) {
+  if (f && f.cut_at !== null && player.duration) {
+    const pct = (f.cut_at / player.duration) * 100;
+    cutMarker.style.left = pct + "%";
+    cutMarker.style.display = "block";
+  } else {
+    cutMarker.style.display = "none";
+  }
+}
 
 function fmt(t) {
   const m = Math.floor(t / 60);
@@ -253,20 +334,42 @@ function loadSong(i) {
   player.currentTime = 0;
   timecode.textContent = "00:00.0";
   duration.textContent = "";
+  seekbar.value = 0;
+  seekbar.max = 100;
+  updateSeekbarFill();
+  cutMarker.style.display = "none";
   renderList();
   player.play().catch(() => {});
 }
 
 player.addEventListener("timeupdate", () => {
   timecode.textContent = fmt(player.currentTime);
+  if (!isSeeking) {
+    seekbar.value = player.currentTime;
+    updateSeekbarFill();
+  }
 });
 player.addEventListener("loadedmetadata", () => {
   duration.textContent = "Gesamtlänge: " + fmt(player.duration);
+  seekbar.max = player.duration;
+  seekbar.value = player.currentTime;
+  updateSeekbarFill();
+  updateCutMarker(files[currentIndex]);
 });
 player.addEventListener("play", () => playbtn.textContent = "⏸");
 player.addEventListener("pause", () => playbtn.textContent = "▶");
 player.addEventListener("ended", () => {
   goNext();
+});
+
+seekbar.addEventListener("input", () => {
+  isSeeking = true;
+  player.currentTime = parseFloat(seekbar.value);
+  timecode.textContent = fmt(player.currentTime);
+  updateSeekbarFill();
+});
+seekbar.addEventListener("change", () => {
+  isSeeking = false;
 });
 
 function togglePlay() {
@@ -308,6 +411,7 @@ async function markHook() {
       f.skipped = false;
       showToast(`Geschnitten @ ${fmt(data.seconds)}`);
       renderList();
+      updateCutMarker(f);
       setTimeout(goNext, 500);
     } else {
       showToast("Fehler: " + data.error, true);
