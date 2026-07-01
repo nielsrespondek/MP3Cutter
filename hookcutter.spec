@@ -13,7 +13,7 @@ a = Analysis(
         ('templates', 'templates'),
         ('assets', 'assets'),
     ],
-    hiddenimports=['flask', 'werkzeug', 'jinja2'],
+    hiddenimports=['flask', 'werkzeug', 'jinja2', 'webview'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

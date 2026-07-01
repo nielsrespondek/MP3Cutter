@@ -296,8 +296,36 @@ def pick_folders_gui(defaults):
     return result
 
 
+def run_app_window(url):
+    """Oeffnet die Oberflaeche als eigenstaendiges App-Fenster (kein Browser-Tab noetig).
+    Nutzt die im System vorhandene WebView-Komponente (unter Windows: Edge WebView2).
+    Blockiert bis das Fenster geschlossen wird."""
+    try:
+        import webview
+    except ImportError:
+        webview = None
+
+    if webview is not None:
+        try:
+            webview.create_window(
+                "Hook-Cutter",
+                url,
+                width=1150,
+                height=760,
+                min_size=(820, 560),
+            )
+            webview.start()
+            return
+        except Exception as e:
+            print(f"Eigenes App-Fenster nicht verfuegbar ({e}), weiche auf Browser aus.")
+
+    # Fallback, falls pywebview fehlt oder auf diesem System nicht starten kann
+    webbrowser.open(url)
+    show_status_window(url)
+
+
 def show_status_window(url):
-    """Kleines Fenster, das offen bleibt, solange der Server laeuft (fuer Doppelklick-Start)."""
+    """Fallback-Statusfenster, falls kein eigenes App-Fenster verfuegbar ist."""
     import tkinter as tk
 
     root = tk.Tk()
@@ -384,12 +412,12 @@ def main():
     )
     server_thread.start()
     time.sleep(0.8)
-    webbrowser.open(url)
 
     if used_gui:
-        # Per Doppelklick gestartet -> Statusfenster haelt den Prozess am Leben
-        show_status_window(url)
+        # Per Doppelklick gestartet -> eigenstaendiges App-Fenster statt Browser-Tab
+        run_app_window(url)
     else:
+        webbrowser.open(url)
         print(f"Oeffne im Browser: {url}")
         print("Zum Beenden: Strg+C")
         try:
