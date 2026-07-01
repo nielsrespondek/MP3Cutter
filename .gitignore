@@ -1,0 +1,15 @@
+# Build-Ausgaben
+build/
+dist/
+*.spec.bak
+__pycache__/
+*.pyc
+
+# lokale Konfiguration / Test-Daten
+.hookcutter_state.json
+*.egg-info/
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db

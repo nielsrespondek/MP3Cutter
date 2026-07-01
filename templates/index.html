@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hook-Cutter</title>
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1e2127;
+    --accent: #4ade80;
+    --accent-dark: #22c55e;
+    --text: #e8e8ea;
+    --text-dim: #8a8f98;
+    --border: #2c303a;
+    --danger: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #sidebar {
+    width: 320px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+  #sidebar h1 {
+    font-size: 16px;
+    padding: 16px;
+    margin: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  #progress {
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+  }
+  #filelist {
+    overflow-y: auto;
+    flex: 1;
+  }
+  .file-item {
+    padding: 10px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .file-item:hover { background: #262a32; }
+  .file-item.active { background: #2a3f2f; }
+  .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .file-status { font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
+  .file-status.done { color: var(--accent); }
+
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    gap: 24px;
+  }
+  #songname {
+    font-size: 22px;
+    font-weight: 600;
+    text-align: center;
+    word-break: break-word;
+    max-width: 700px;
+  }
+  #timecode {
+    font-size: 48px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  #duration { font-size: 14px; color: var(--text-dim); }
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  button {
+    font-family: inherit;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.05s ease, background 0.15s ease;
+  }
+  button:active { transform: scale(0.96); }
+  .btn-round {
+    width: 52px;
+    height: 52px;
+    font-size: 20px;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-round:hover { background: #262a32; }
+  #markbtn {
+    padding: 20px 48px;
+    font-size: 20px;
+    font-weight: 700;
+    background: var(--accent);
+    color: #0a1a0f;
+  }
+  #markbtn:hover { background: var(--accent-dark); }
+  #skipbtn {
+    padding: 12px 20px;
+    font-size: 14px;
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  #skipbtn:hover { color: var(--text); border-color: var(--text-dim); }
+  .hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: center;
+    max-width: 500px;
+  }
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--accent);
+    color: #0a1a0f;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.error { background: var(--danger); }
+  .reset-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 11px;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  #empty-state {
+    text-align: center;
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h1>🎧 Hook-Cutter</h1>
+  <div id="progress">lädt...</div>
+  <div id="filelist"></div>
+</div>
+
+<div id="main">
+  <div id="songname">lädt...</div>
+  <div id="timecode">00:00.0</div>
+  <div id="duration"></div>
+
+  <div class="controls">
+    <button class="btn-round" id="prevbtn" title="Vorheriger Song">⏮</button>
+    <button class="btn-round" id="backbtn" title="-5s">−5</button>
+    <button class="btn-round" id="playbtn" title="Play/Pause (Leertaste)">▶</button>
+    <button class="btn-round" id="fwdbtn" title="+5s">+5</button>
+    <button class="btn-round" id="nextbtn" title="Nächster Song">⏭</button>
+  </div>
+
+  <button id="markbtn">✂️ Hier ist der Hook!</button>
+  <button id="skipbtn">Ohne Schnitt übernehmen (kein Intro vorhanden)</button>
+
+  <div class="hint">
+    <b>Leertaste</b> = Play/Pause · <b>Enter</b> = Hier schneiden ·
+    <b>← →</b> = ±5s · <b>↑ ↓</b> = ±1s · <b>N</b> = nächster Song
+  </div>
+
+  <audio id="player"></audio>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let files = [];
+let currentIndex = 0;
+const player = document.getElementById("player");
+const songname = document.getElementById("songname");
+const timecode = document.getElementById("timecode");
+const duration = document.getElementById("duration");
+const playbtn = document.getElementById("playbtn");
+const progress = document.getElementById("progress");
+const filelist = document.getElementById("filelist");
+
+function fmt(t) {
+  const m = Math.floor(t / 60);
+  const s = (t % 60).toFixed(1).padStart(4, "0");
+  return `${String(m).padStart(2, "0")}:${s}`;
+}
+
+async function loadFiles() {
+  const res = await fetch("/api/files");
+  files = await res.json();
+  renderList();
+  if (files.length > 0) {
+    const firstOpen = files.findIndex(f => f.cut_at === null && !f.skipped);
+    loadSong(firstOpen >= 0 ? firstOpen : 0);
+  } else {
+    songname.textContent = "Keine MP3-Dateien im Input-Ordner gefunden.";
+  }
+}
+
+function renderList() {
+  const doneCount = files.filter(f => f.cut_at !== null || f.skipped).length;
+  progress.textContent = `${doneCount} / ${files.length} erledigt`;
+
+  filelist.innerHTML = "";
+  files.forEach((f, i) => {
+    const div = document.createElement("div");
+    div.className = "file-item" + (i === currentIndex ? " active" : "");
+    const isDone = f.cut_at !== null || f.skipped;
+    div.innerHTML = `
+      <span class="file-name">${f.name}</span>
+      <span class="file-status ${isDone ? 'done' : ''}">
+        ${f.skipped ? '➡️ übernommen' : (f.cut_at !== null ? '✅ ' + fmt(f.cut_at) : '')}
+      </span>
+    `;
+    div.onclick = () => loadSong(i);
+    filelist.appendChild(div);
+  });
+}
+
+function loadSong(i) {
+  if (i < 0 || i >= files.length) return;
+  currentIndex = i;
+  const f = files[i];
+  songname.textContent = f.name;
+  player.src = "/audio/" + encodeURIComponent(f.name);
+  player.currentTime = 0;
+  timecode.textContent = "00:00.0";
+  duration.textContent = "";
+  renderList();
+  player.play().catch(() => {});
+}
+
+player.addEventListener("timeupdate", () => {
+  timecode.textContent = fmt(player.currentTime);
+});
+player.addEventListener("loadedmetadata", () => {
+  duration.textContent = "Gesamtlänge: " + fmt(player.duration);
+});
+player.addEventListener("play", () => playbtn.textContent = "⏸");
+player.addEventListener("pause", () => playbtn.textContent = "▶");
+player.addEventListener("ended", () => {
+  goNext();
+});
+
+function togglePlay() {
+  if (player.paused) player.play(); else player.pause();
+}
+
+function seek(delta) {
+  player.currentTime = Math.max(0, player.currentTime + delta);
+}
+
+function goNext() {
+  if (currentIndex < files.length - 1) loadSong(currentIndex + 1);
+}
+function goPrev() {
+  if (currentIndex > 0) loadSong(currentIndex - 1);
+}
+
+function showToast(msg, isError = false) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = isError ? "show error" : "show";
+  setTimeout(() => { t.className = t.className.replace("show", ""); }, 1800);
+}
+
+async function markHook() {
+  const f = files[currentIndex];
+  const seconds = player.currentTime;
+  player.pause();
+  markbtn.disabled = true;
+  try {
+    const res = await fetch("/api/cut", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: f.name, seconds }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      f.cut_at = data.seconds;
+      f.skipped = false;
+      showToast(`Geschnitten @ ${fmt(data.seconds)}`);
+      renderList();
+      setTimeout(goNext, 500);
+    } else {
+      showToast("Fehler: " + data.error, true);
+    }
+  } catch (e) {
+    showToast("Fehler: " + e, true);
+  } finally {
+    markbtn.disabled = false;
+  }
+}
+
+async function skipSong() {
+  const f = files[currentIndex];
+  const res = await fetch("/api/skip", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: f.name }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    f.skipped = true;
+    f.cut_at = null;
+    showToast("Ohne Schnitt übernommen");
+    renderList();
+    setTimeout(goNext, 300);
+  } else {
+    showToast("Fehler: " + data.error, true);
+  }
+}
+
+document.getElementById("markbtn").onclick = markHook;
+document.getElementById("skipbtn").onclick = skipSong;
+document.getElementById("playbtn").onclick = togglePlay;
+document.getElementById("nextbtn").onclick = goNext;
+document.getElementById("prevbtn").onclick = goPrev;
+document.getElementById("backbtn").onclick = () => seek(-5);
+document.getElementById("fwdbtn").onclick = () => seek(5);
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") return;
+  switch (e.key) {
+    case " ":
+      e.preventDefault();
+      togglePlay();
+      break;
+    case "Enter":
+      e.preventDefault();
+      markHook();
+      break;
+    case "ArrowLeft":
+      e.preventDefault();
+      seek(-5);
+      break;
+    case "ArrowRight":
+      e.preventDefault();
+      seek(5);
+      break;
+    case "ArrowUp":
+      e.preventDefault();
+      seek(1);
+      break;
+    case "ArrowDown":
+      e.preventDefault();
+      seek(-1);
+      break;
+    case "n":
+    case "N":
+      goNext();
+      break;
+  }
+});
+
+loadFiles();
+</script>
+
+</body>
+</html>
