@@ -1,8 +1,12 @@
 # 🎧 Hook-Cutter
 
-Songs nacheinander anhören und mit einem Klick (oder Enter) das Intro
-wegschneiden, sodass gleich der Refrain / die Hook kommt. Ideal, um viele
-MP3s schnell für Quiz-Runden, DJ-Sets o.ä. vorzubereiten.
+Songs nacheinander anhören und mit einem Klick (oder Enter) an genau der
+richtigen Stelle zuschneiden — in beide Richtungen:
+
+- **Intro wegschneiden** — Refrain/Hook bleibt übrig (z. B. für Quiz-Runden,
+  DJ-Sets, Playlists)
+- **Hook wegschneiden** — nur das Intro bleibt übrig (z. B. für
+  "Intro raten"-Spiele, wo der Refrain natürlich nicht schon verraten werden darf)
 
 Der Schnitt läuft verlustfrei über `ffmpeg -c copy` — dauert pro Datei nur
 Sekundenbruchteile, egal wie viele Songs du hast.
@@ -29,11 +33,15 @@ Auf **„Weitere Informationen"** → **„Trotzdem ausführen"** klicken.
 1. HookCutter.exe starten
 2. Im Fenster den Ordner mit den Original-MP3s und einen Ausgabeordner
    auswählen (wird für's nächste Mal gemerkt)
-3. Browser öffnet sich automatisch — Songs spielen nacheinander ab
-4. **Leertaste** = Play/Pause, **← →** = ±5s, **↑ ↓** = ±1s zum Feinjustieren
-5. **Enter** oder Klick auf „✂️ Hier ist der Hook!" schneidet die Datei ab der
-   aktuellen Stelle und springt automatisch zum nächsten Song
-6. Kein Intro vorhanden? „Ohne Schnitt übernehmen" klicken
+3. Ein eigenständiges App-Fenster öffnet sich — Songs spielen nacheinander ab
+4. **Leertaste** = Play/Pause, **← →** = ±5s, **↑ ↓** = ±1s, Zeitleiste zum
+   direkten Springen/Scrubben
+5. Oben Modus wählen (oder Taste **T**):
+   - **✂️ Intro wegschneiden** — behält alles ab der Markierung (Hook bleibt)
+   - **✂️ Hook wegschneiden** — behält alles bis zur Markierung (nur Intro bleibt)
+6. **Enter** oder Klick auf den Schneiden-Button schneidet an der aktuellen
+   Stelle im gewählten Modus und springt automatisch zum nächsten Song
+7. Kein Schnitt nötig? „Ohne Schnitt übernehmen" klicken
 
 Fortschritt wird gespeichert — du kannst also jederzeit unterbrechen und
 später weitermachen.

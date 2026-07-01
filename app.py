@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Hook-Cutter: MP3-Intros wegschneiden mit einem Klick.
+Hook-Cutter: MP3s an der richtigen Stelle zuschneiden - Intro raus (nur
+Refrain/Hook bleibt) ODER Hook raus (nur Intro bleibt, z.B. fuer
+"Intro raten"-Runden). Ein Klick, du entscheidest die Richtung.
 
 Nutzung:
     python app.py --input /pfad/zu/mp3s --output /pfad/zu/geschnitten [--port 5050]

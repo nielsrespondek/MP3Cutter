@@ -10,7 +10,7 @@ cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Hook-Cutter
-Comment=MP3-Intros wegschneiden
+Comment=MP3s zuschneiden (Intro oder Hook wegschneiden)
 Exec=bash -c 'cd "$DIR" && python3 app.py'
 Icon=audio-x-generic
 Terminal=false
