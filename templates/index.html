@@ -37,7 +37,24 @@
     padding: 16px;
     margin: 0;
     border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
   }
+  #refreshbtn {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+    line-height: 1;
+    background: var(--panel);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #refreshbtn:hover { background: #262a32; color: var(--text); }
+  #refreshbtn.spinning { animation: spin 0.6s linear; }
+  @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
   #progress {
     padding: 8px 16px;
     font-size: 13px;
@@ -245,7 +262,10 @@
 <body>
 
 <div id="sidebar">
-  <h1>🎧 Hook-Cutter</h1>
+  <h1>
+    <span>🎧 Hook-Cutter</span>
+    <button id="refreshbtn" title="Ordner neu einlesen (R)">⟳</button>
+  </h1>
   <div id="progress">lädt...</div>
   <div id="filelist"></div>
 </div>
@@ -279,7 +299,7 @@
   <div class="hint">
     <b>Leertaste</b> = Play/Pause · <b>Enter</b> = Hier schneiden ·
     <b>← →</b> = ±5s · <b>↑ ↓</b> = ±1s · <b>N</b> = nächster Song ·
-    <b>T</b> = Modus wechseln
+    <b>T</b> = Modus wechseln · <b>R</b> = Ordner neu einlesen
   </div>
 
   <audio id="player"></audio>
@@ -348,6 +368,51 @@ async function loadFiles() {
   } else {
     songname.textContent = "Keine MP3-Dateien im Input-Ordner gefunden.";
   }
+}
+
+async function refreshFiles() {
+  const btn = document.getElementById("refreshbtn");
+  const prevName = files[currentIndex] ? files[currentIndex].name : null;
+  const prevCount = files.length;
+
+  // Dreh-Animation bei jedem Klick neu starten
+  btn.classList.remove("spinning");
+  void btn.offsetWidth;
+  btn.classList.add("spinning");
+
+  try {
+    const res = await fetch("/api/files");
+    files = await res.json();
+  } catch (e) {
+    showToast("Aktualisieren fehlgeschlagen: " + e, true);
+    return;
+  }
+
+  if (files.length === 0) {
+    currentIndex = 0;
+    renderList();
+    songname.textContent = "Keine MP3-Dateien im Input-Ordner gefunden.";
+    player.pause();
+    player.removeAttribute("src");
+    player.load();
+    return;
+  }
+
+  // Aktuellen Song beibehalten, falls er noch existiert (kein Neustart der Wiedergabe)
+  const keepIdx = prevName ? files.findIndex(f => f.name === prevName) : -1;
+  if (keepIdx >= 0) {
+    currentIndex = keepIdx;
+    renderList();
+    updateCutMarker(files[currentIndex]);
+  } else {
+    const firstOpen = files.findIndex(f => f.cut_at === null && !f.skipped);
+    loadSong(firstOpen >= 0 ? firstOpen : 0);
+  }
+
+  const diff = files.length - prevCount;
+  showToast(diff > 0
+    ? `Aktualisiert \u2013 ${diff} neue Datei${diff === 1 ? "" : "en"}`
+    : "Ordner aktualisiert");
 }
 
 function renderList() {
@@ -489,6 +554,7 @@ async function skipSong() {
   }
 }
 
+document.getElementById("refreshbtn").onclick = refreshFiles;
 document.getElementById("markbtn").onclick = markHook;
 document.getElementById("skipbtn").onclick = skipSong;
 document.getElementById("playbtn").onclick = togglePlay;
@@ -531,6 +597,10 @@ document.addEventListener("keydown", (e) => {
     case "t":
     case "T":
       setMode(cutMode === "from" ? "to" : "from");
+      break;
+    case "r":
+    case "R":
+      refreshFiles();
       break;
   }
 });
